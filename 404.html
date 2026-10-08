@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#1F3C78">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data: blob:; base-uri 'none'; form-action 'none'">
+<title>Aplicativo descontinuado</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:17px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#1F3C78;color:#fff;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:20px}
+.c{max-width:520px;width:100%;margin-top:4vh}
+h1{font-size:25px;margin:0 0 8px}
+p{margin:8px 0}
+.n{background:#ffffff1f;border-radius:12px;padding:12px;margin:14px 0;font-size:15.5px}
+.b{display:block;width:100%;border:0;border-radius:14px;padding:18px 14px;margin:10px 0 4px;font:inherit;font-weight:800;font-size:18px;background:#fff;color:#1F3C78}
+.b.or{background:#FF7A06;color:#fff}.b.vd{background:#2E7D32;color:#fff}.b.vm{background:#B71C1C;color:#fff}
+.b:disabled{opacity:.5}
+.s{font-size:14.5px;min-height:20px;margin:0 0 8px;color:#FFE0B2}.s.ok{color:#B9F6CA}
+a{color:#FFD54F;font-weight:700;word-break:break-all}
+.l{background:none;border:0;color:#FFD54F;text-decoration:underline;font:inherit;font-size:14px;padding:6px 0}
+small{opacity:.85}
+</style>
+</head>
+<body>
+<div class="c" id="c">
+  <h1>Este app foi descontinuado</h1>
+  <p>Esta versão do aplicativo de vistoria não é mais atualizada e foi desligada.</p>
+  <div class="n" id="novo" style="display:none"></div>
+  <div id="area"><p><small>Verificando os dados salvos neste aparelho…</small></p></div>
+</div>
+<script>
+/* ENDEREÇO DA NOVA VERSÃO (opcional): coloque entre as aspas, por exemplo https://vistoria-cbmpa.web.app */
+var NOVO_ENDERECO = '';
+
+(function () {
+'use strict';
+var KS = 'vistoria_cbmpa_v1', KASS = 'vistoria_cbmpa_assin_vist', DBN = 'vistoria_cbmpa_fotos';
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); };
+var DOCS = { d1: 'Certificado de licenciamento anterior (AVCB/CLP/ACPS/DIV/TAACB) e validade', d2: 'Projeto técnico aprovado (cópia na portaria)', d3: 'ART/RRT de execução ou manutenção das medidas / sistemas fixos', d4: 'Notas fiscais de compra/manutenção/recarga de extintores e equipamentos', d5: 'PSCIE – Programa de Segurança Contra Incêndio e Emergência', d6: 'Plano de emergência + planilha operacional + planta de risco + comprovante de simulado', d7: 'Certificados da brigada (formação, ARP) e memorial de cálculo', d8: 'Brigadistas profissionais – certificados e uniforme', d9: 'Placa na entrada: medidas de segurança + lotação máxima', d10: 'Certificado do guarda-vidas de piscina' };
+var CAMPOS = [['razao', 'Razão social'], ['cnpj', 'CNPJ'], ['cnae', 'CNAE'], ['end', 'Endereço'], ['tel', 'Telefone / contato'], ['data', 'Data da vistoria'], ['vist', 'Vistoriador'], ['acomp', 'Responsável acompanhante']];
+var DADOS = [['div', 'Divisão'], ['area', 'Área total (m²)'], ['pav', 'Andares'], ['alt', 'Altura (m)'], ['apav', 'Área do maior andar (m²)'], ['pf', 'Funcionários no turno'], ['pfl', 'Público simultâneo'], ['carga', 'Carga de incêndio (MJ/m²)'], ['glp', 'GLP no local (kg)'], ['gas', 'Outro gás inflamável'], ['gasM3', 'Volume de gases (m³)'], ['revGlp', 'Revenda de GLP'], ['glpArea', 'GLP da área de revenda (kg)'], ['liq', 'Líquido inflamável (L)'], ['liqFin', 'Finalidade do líquido'], ['liqTq', 'Armazenamento do líquido'], ['sub', 'Subsolo (m²)'], ['lei', 'Leitos'], ['cc', 'Call center > 250 funcionários'], ['m2hid', 'Sistema de hidrantes (M-2)'], ['perig', 'Produto perigoso'], ['q1', 'Rota de saída acima de 20 m'], ['q2', 'Depósito acima de 750 m²']];
+var ESTADO = { NT: 'NÃO TEM', NC: 'NÃO CONFORME' };
+var ST = { pdf: null, fotos: null, modoZip: false, pasta: null, verificado: { pdf: false, fotos: false } };
+var VIS = [];
+
+/* ---------------- leitura dos dados antigos ---------------- */
+function lerLocal() { try { return JSON.parse(localStorage.getItem(KS) || 'null'); } catch (e) { return null; } }
+function abrirDB() { return new Promise(function (ok) { if (!window.indexedDB) return ok(null); var r; try { r = indexedDB.open(DBN); } catch (e) { return ok(null); } r.onupgradeneeded = function () { try { r.transaction.abort(); } catch (e) {} }; r.onsuccess = function () { ok(r.result); }; r.onerror = function () { ok(null); }; }); }
+function todos(db, loja) { return new Promise(function (ok) { try { if (!db.objectStoreNames.contains(loja)) return ok([]); var q = db.transaction(loja, 'readonly').objectStore(loja).getAll(); q.onsuccess = function () { ok(q.result || []); }; q.onerror = function () { ok([]); }; } catch (e) { ok([]); } }); }
+function temConteudo(S) { return !!S && (Object.keys(S.f || {}).some(function (k) { return S.f[k] !== '' && S.f[k] != null; }) || Object.keys(S.ans || {}).length > 0); }
+function limpaNome(s) { return String(s || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 45); }
+function dtTxt(ts) { return new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); }
+function ymd(S, ts) { var d = (S && S.f && S.f.data) || ''; return d ? d.replace(/-/g, '') : new Date(ts || Date.now()).toISOString().slice(0, 10).replace(/-/g, ''); }
+async function carregar() {
+  var S0 = lerLocal(), db = await abrirDB(), fotos = [], hist = [];
+  if (db) { fotos = await todos(db, 'fotos'); hist = await todos(db, 'hist'); db.close(); }
+  var porVid = {}; fotos.forEach(function (r) { (porVid[r.vid] = porVid[r.vid] || []).push(r); });
+  VIS = []; var usados = {};
+  var add = function (S, ts, atual) { var vid = S && S.vid; var f = (vid && porVid[vid]) || []; if (vid) usados[vid] = 1; VIS.push({ S: S || { f: {}, ans: {}, obs: {}, pos: {} }, ts: ts || Date.now(), atual: !!atual, fotos: f.sort(function (a, b) { return (a.seq || 0) - (b.seq || 0) || a.ts - b.ts; }) }); };
+  if (temConteudo(S0) || (S0 && S0.vid && porVid[S0.vid])) add(S0, Date.now(), true);
+  hist.sort(function (a, b) { return b.ts - a.ts; }).forEach(function (h) { if (h.S && (temConteudo(h.S) || (h.S.vid && porVid[h.S.vid]))) add(h.S, h.ts, false); });
+  var soltas = fotos.filter(function (r) { return !usados[r.vid]; });
+  if (soltas.length) VIS.push({ S: { f: { razao: 'Fotos sem vistoria associada' }, ans: {}, obs: {}, pos: {} }, ts: Date.now(), atual: false, fotos: soltas, soSoltas: true });
+  var nomes = {}; VIS.forEach(function (v) { var b = 'Vistoria' + (limpaNome(v.S.f && v.S.f.razao) ? ' ' + limpaNome(v.S.f.razao) : '') + ' ' + ymd(v.S, v.ts); nomes[b] = (nomes[b] || 0) + 1; v.base = nomes[b] > 1 ? b + ' (' + nomes[b] + ')' : b; });
+  return VIS;
+}
+
+/* ---------------- PDF mínimo (sem bibliotecas) ---------------- */
+var WID = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584];
+var TROCA = { '–': '-', '—': '-', '“': '"', '”': '"', '‘': "'", '’': "'", '•': '-', '…': '...', '✔': 'OK', '✖': 'X', '≤': '<=', '≥': '>=', '→': '->', '\u00A0': ' ' };
+function win(s) { var o = ''; s = String(s == null ? '' : s); for (var i = 0; i < s.length; i++) { var ch = s[i], c = s.charCodeAt(i); if (TROCA[ch] !== undefined) o += TROCA[ch]; else if (c < 256) o += ch; else o += '?'; } return o; }
+function pesc(s) { return win(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[\r\n]+/g, ' '); }
+function larg(s, sz, b) { var t = 0; for (var i = 0; i < s.length; i++) { var c = s[i].normalize ? s[i].normalize('NFD').charCodeAt(0) : s.charCodeAt(i); t += (c >= 32 && c <= 126) ? WID[c - 32] : 556; } return t * sz / 1000 * (b ? 1.07 : 1); }
+function bytes(str) { var u = new Uint8Array(str.length); for (var i = 0; i < str.length; i++) u[i] = str.charCodeAt(i) & 255; return u; }
+function criarPdf(rodape) {
+  var W = 595.28, H = 841.89, M = 44, pages = [], imgs = [], pg, y;
+  function nova() { pg = { ops: [], im: [] }; pages.push(pg); y = H - M; }
+  nova();
+  function quebra(s, sz, b, max) {
+    var out = [], pal = String(s).split(' '), cur = '';
+    pal.forEach(function (p) {
+      while (larg(p, sz, b) > max) { var k = p.length; while (k > 1 && larg(p.slice(0, k), sz, b) > max) k--; if (cur) { out.push(cur); cur = ''; } out.push(p.slice(0, k)); p = p.slice(k); }
+      var t = cur ? cur + ' ' + p : p; if (larg(t, sz, b) <= max || !cur) cur = t; else { out.push(cur); cur = p; }
+    });
+    if (cur) out.push(cur); return out;
+  }
+  var api = {
+    texto: function (s, o) { o = o || {}; var sz = o.sz || 10, ind = o.ind || 0, x = M + ind;
+      quebra(s, sz, o.b, W - 2 * M - ind).forEach(function (ln) { if (y - sz < M + 24) nova(); pg.ops.push((o.cor || '0 0 0') + ' rg BT /F' + (o.b ? 2 : 1) + ' ' + sz + ' Tf ' + x.toFixed(1) + ' ' + (y - sz).toFixed(1) + ' Td (' + pesc(ln) + ') Tj ET'); y -= sz * 1.32; });
+      y -= (o.gap || 0); },
+    reserva: function (h) { if (y - h < M + 24) nova(); },
+    faixa: function (s, min) { if (y < M + (min || 70)) nova(); pg.ops.push('0.12 0.24 0.47 rg ' + M + ' ' + (y - 17).toFixed(1) + ' ' + (W - 2 * M).toFixed(1) + ' 17 re f'); pg.ops.push('1 1 1 rg BT /F2 10.5 Tf ' + (M + 6) + ' ' + (y - 12.5).toFixed(1) + ' Td (' + pesc(s) + ') Tj ET'); y -= 23; },
+    espaco: function (n) { y -= n; },
+    imagem: function (jpg, w, h, mw, mh) { var k = Math.min(mw / w, mh / h, 1), sw = w * k, sh = h * k; if (y - sh < M + 24) nova(); imgs.push({ jpg: jpg, w: w, h: h }); var id = imgs.length; pg.im.push(id); pg.ops.push('q ' + sw.toFixed(1) + ' 0 0 ' + sh.toFixed(1) + ' ' + M + ' ' + (y - sh).toFixed(1) + ' cm /Im' + id + ' Do Q'); y -= sh + 4; },
+    fechar: function () {
+      var parts = [], off = 0, offs = [0], n = 0;
+      var P = function (u) { if (typeof u === 'string') u = bytes(u); parts.push(u); off += u.length; };
+      var obj = function (head, stream) { n++; offs[n] = off; P(n + ' 0 obj\n'); if (stream) { P(head.replace('LEN', stream.length) + '\nstream\n'); P(stream); P('\nendstream\nendobj\n'); } else P(head + '\nendobj\n'); return n; };
+      var total = pages.length;
+      P('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+      var pgBase = 4 + imgs.length;           // objetos: 1 catálogo, 2 páginas, 3 F1, 4 F2, imagens, depois (conteúdo, página) por página
+      var kids = pages.map(function (_, i) { return (pgBase + 2 + 2 * i) + ' 0 R'; }).join(' ');
+      obj('<</Type/Catalog/Pages 2 0 R>>'); obj('<</Type/Pages/Kids[' + kids + ']/Count ' + total + '>>');
+      obj('<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>'); obj('<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>');
+      imgs.forEach(function (im) { obj('<</Type/XObject/Subtype/Image/Width ' + im.w + '/Height ' + im.h + '/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length LEN>>', im.jpg); });
+      pages.forEach(function (p, i) {
+        p.ops.push('0.35 0.35 0.35 rg BT /F1 8 Tf ' + M + ' 26 Td (' + pesc(rodape) + ') Tj ET'); p.ops.push('0.35 0.35 0.35 rg BT /F1 8 Tf ' + (W - M - 60) + ' 26 Td (' + pesc('Página ' + (i + 1) + ' de ' + total) + ') Tj ET');
+        var cid = obj('<</Length LEN>>', bytes(p.ops.join('\n')));
+        var res = '<</Font<</F1 3 0 R/F2 4 0 R>>' + (p.im.length ? '/XObject<<' + p.im.map(function (id) { return '/Im' + id + ' ' + (4 + id) + ' 0 R'; }).join('') + '>>' : '') + '>>';
+        obj('<</Type/Page/Parent 2 0 R/MediaBox[0 0 ' + W + ' ' + H + ']/Resources' + res + '/Contents ' + cid + ' 0 R>>');
+      });
+      var xo = off; P('xref\n0 ' + (n + 1) + '\n0000000000 65535 f \n'); for (var i = 1; i <= n; i++) P(('0000000000' + offs[i]).slice(-10) + ' 00000 n \n');
+      P('trailer\n<</Size ' + (n + 1) + '/Root 1 0 R>>\nstartxref\n' + xo + '\n%%EOF\n');
+      return new Blob(parts, { type: 'application/pdf' });
+    }
+  };
+  return api;
+}
+function pngParaJpeg(dataUrl) { return new Promise(function (ok) { var im = new Image(); im.onload = function () { try { var c = document.createElement('canvas'); c.width = im.width; c.height = im.height; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0); var u = c.toDataURL('image/jpeg', 0.9).split(',')[1], b = atob(u), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); ok({ jpg: a, w: c.width, h: c.height }); } catch (e) { ok(null); } }; im.onerror = function () { ok(null); }; im.src = dataUrl; }); }
+async function pdfDaVistoria(v) {
+  var S = v.S, f = S.f || {}, ans = S.ans || {}, obs = S.obs || {}, pos = S.pos || {};
+  var pdf = criarPdf('Cópia de segurança do app de vistoria (versão antiga) · gerada em ' + new Date().toLocaleDateString('pt-BR'));
+  pdf.faixa('RELATÓRIO DE VISTORIA – CÓPIA DE SEGURANÇA'); pdf.espaco(2);
+  pdf.texto('Gerado a partir dos dados que estavam guardados neste aparelho no aplicativo antigo. A classificação, os cálculos e as exigências NÃO foram recalculados aqui: constam os dados informados e as verificações registradas pelo vistoriador.', { sz: 8.5, cor: '0.3 0.3 0.3', gap: 6 });
+  pdf.faixa('1. IDENTIFICAÇÃO'); CAMPOS.forEach(function (c) { if (f[c[0]]) pdf.texto(c[1] + ': ' + (c[0] === 'data' ? String(f.data).split('-').reverse().join('/') : f[c[0]]), { sz: 10 }); }); pdf.espaco(6);
+  pdf.faixa('2. DADOS DO ESTABELECIMENTO INFORMADOS'); var temD = false; DADOS.forEach(function (c) { if (f[c[0]] !== undefined && f[c[0]] !== '') { temD = true; pdf.texto(c[1] + ': ' + f[c[0]], { sz: 10 }); } }); if (!temD) pdf.texto('Nenhum dado informado.', { sz: 10 }); pdf.espaco(6);
+  var ch = Object.keys(ans);
+  var lista = function (pre, rot, tradu) { var itens = ch.filter(function (k) { return k.indexOf(pre) === 0 && ans[k]; }); if (!itens.length) return 0; itens.forEach(function (k) { var nome = k.slice(pre.length), t = tradu ? tradu(nome) : nome; var e = ESTADO[ans[k]] || (ans[k] === 'TEM' ? (rot === 'ITENS ESPECÍFICOS E ART' ? 'CONFORME' : 'TEM') : ans[k]); pdf.texto('• ' + t + ' – ' + e, { sz: 10, b: ans[k] === 'NC' || ans[k] === 'NT', ind: 4 }); if (obs[k]) pdf.texto('Obs.: ' + obs[k], { sz: 9, ind: 16, cor: '0.25 0.25 0.25' }); }); return itens.length; };
+  pdf.faixa('3. MEDIDAS DE SEGURANÇA – VERIFICAÇÕES REGISTRADAS'); if (!lista('m|', 'MEDIDAS')) pdf.texto('Nenhuma verificação registrada.', { sz: 10 }); pdf.espaco(6);
+  pdf.faixa('4. ITENS ESPECÍFICOS E ART/RRT'); var possui = Object.keys(pos).filter(function (k) { return pos[k] === 'POSSUI'; });
+  if (possui.length) pdf.texto('Itens marcados como existentes no local: ' + possui.join('; ') + '.', { sz: 10, gap: 3 });
+  var nEsp = lista('s|', 'ITENS ESPECÍFICOS E ART') + lista('a|', 'ITENS ESPECÍFICOS E ART', function (n) { return 'ART/RRT – ' + n; }); if (!nEsp && !possui.length) pdf.texto('Nenhum item específico registrado.', { sz: 10 }); pdf.espaco(6);
+  pdf.faixa('5. DOCUMENTOS'); if (!lista('d|', 'DOCUMENTOS', function (n) { return DOCS[n] || n; })) pdf.texto('Nenhum documento verificado.', { sz: 10 }); pdf.espaco(6);
+  var rot = {}; ch.forEach(function (k) { if (k.indexOf('r|') === 0 && ans[k]) { var nm = k.split('|')[1]; rot[nm] = rot[nm] || { c: 0, nc: 0 }; if (ans[k] === 'NC') rot[nm].nc++; else if (ans[k] === 'TEM') rot[nm].c++; } });
+  var rn = Object.keys(rot); if (rn.length) { pdf.faixa('6. CHECKLISTS OPCIONAIS'); rn.forEach(function (nm) { pdf.texto('• ' + nm + ': ' + rot[nm].c + ' conforme(s), ' + rot[nm].nc + ' não conforme(s). As não conformidades constam nas observações do item.', { sz: 10, ind: 4 }); }); pdf.espaco(6); }
+  var soObs = Object.keys(obs).filter(function (k) { return obs[k] && !ans[k] && k.indexOf('r|') !== 0; });
+  if (soObs.length) { pdf.faixa('7. OUTRAS OBSERVAÇÕES'); soObs.forEach(function (k) { var p = k.split('|'); var nome = p[0] === 'd' ? (DOCS[p[1]] || p[1]) : p.slice(1).join('|'); pdf.texto('• ' + nome + ': ' + obs[k], { sz: 10, ind: 4 }); }); pdf.espaco(6); }
+  pdf.faixa('FOTOS'); pdf.texto(v.fotos.length ? v.fotos.length + ' foto(s) desta vistoria estão guardadas à parte (arquivos de imagem separados), para importar no sistema oficial.' : 'Nenhuma foto registrada.', { sz: 10 }); pdf.espaco(8);
+  var assin = []; var sv = ''; try { sv = localStorage.getItem(KASS) || ''; } catch (e) {}
+  if (sv.indexOf('data:image/png;base64,') === 0) assin.push(['Vistoriador ' + (f.vist || ''), sv]); if (S.sigAc && String(S.sigAc).indexOf('data:image/png;base64,') === 0) assin.push(['Acompanhante / proprietário ' + (f.acomp || ''), S.sigAc]);
+  if (assin.length) { pdf.faixa('ASSINATURAS', 130); for (var i = 0; i < assin.length; i++) { var im = await pngParaJpeg(assin[i][1]); pdf.reserva(100); pdf.texto(assin[i][0], { sz: 9.5 }); if (im) pdf.imagem(im.jpg, im.w, im.h, 220, 70); pdf.espaco(4); } }
+  return pdf.fechar();
+}
+
+/* ---------------- ZIP simples (sem compressão) ---------------- */
+var CRC = (function () { var t = new Uint32Array(256); for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { var c = 0xFFFFFFFF; for (var i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function montarZip(arq) {
+  var enc = new TextEncoder(), parts = [], cen = [], off = 0, dn = new Date(), dt = ((dn.getHours() << 11) | (dn.getMinutes() << 5) | (dn.getSeconds() >> 1)) & 0xFFFF, dd = (((dn.getFullYear() - 1980) << 9) | ((dn.getMonth() + 1) << 5) | dn.getDate()) & 0xFFFF;
+  arq.forEach(function (a) { var nb = enc.encode(a.nome), crc = crc32(a.dados), h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(10, dt, true); h.setUint16(12, dd, true); h.setUint32(14, crc, true); h.setUint32(18, a.dados.length, true); h.setUint32(22, a.dados.length, true); h.setUint16(26, nb.length, true); parts.push(h.buffer, nb, a.dados); cen.push({ nb: nb, crc: crc, len: a.dados.length, off: off }); off += 30 + nb.length + a.dados.length; });
+  var csz = 0; cen.forEach(function (c) { var h = new DataView(new ArrayBuffer(46)); h.setUint32(0, 0x02014b50, true); h.setUint16(4, 20, true); h.setUint16(6, 20, true); h.setUint16(8, 0x0800, true); h.setUint16(12, dt, true); h.setUint16(14, dd, true); h.setUint32(16, c.crc, true); h.setUint32(20, c.len, true); h.setUint32(24, c.len, true); h.setUint16(28, c.nb.length, true); h.setUint32(42, c.off, true); parts.push(h.buffer, c.nb); csz += 46 + c.nb.length; });
+  var e = new DataView(new ArrayBuffer(22)); e.setUint32(0, 0x06054b50, true); e.setUint16(8, cen.length, true); e.setUint16(10, cen.length, true); e.setUint32(12, csz, true); e.setUint32(16, off, true); parts.push(e.buffer);
+  return new Blob(parts, { type: 'application/zip' });
+}
+
+/* ---------------- nomes das fotos (iguais aos do app antigo, para importar no sistema oficial) ---------------- */
+function nomesFotos(v) { var base = 'Vistoria' + (limpaNome(v.S.f && v.S.f.razao) ? ' ' + limpaNome(v.S.f.razao) : ''), cont = {}; return v.fotos.map(function (r) { var o = limpaNome(r.nome) || 'Geral', k = base + '|' + o.toLowerCase(); cont[k] = (cont[k] || 0) + 1; return { r: r, nome: base + ' (' + o + ')' + (cont[k] > 1 ? ' ' + cont[k] : '') + '.jpg' }; }); }
+function csvFotos(l) { var q = function (x) { return '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"'; }; var rows = [['arquivo', 'o_que_foi_fotografado', 'legenda', 'data_hora']]; l.forEach(function (a) { rows.push([a.nome, a.r.nome, a.r.cap, dtTxt(a.r.ts)]); }); return '\ufeff' + rows.map(function (x) { return x.map(q).join(';'); }).join('\r\n'); }
+
+/* ---------------- salvar ---------------- */
+function baixar(blob, nome) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 6000); }
+async function pegarPasta() { if (ST.modoZip || !window.showDirectoryPicker) return null; if (ST.pasta) return ST.pasta; try { ST.pasta = await window.showDirectoryPicker({ mode: 'readwrite' }); return ST.pasta; } catch (e) { if (e && e.name === 'AbortError') throw e; return null; } }
+async function gravar(dir, caminho, nome, blob) { var d = dir; for (var i = 0; i < caminho.length; i++) d = await d.getDirectoryHandle(caminho[i], { create: true }); var fh = await d.getFileHandle(nome, { create: true }); var w = await fh.createWritable(); await w.write(blob); await w.close(); var f = await fh.getFile(); return f.size === blob.size && blob.size > 0; }
+function msg(id, t, ok) { var e = $(id); if (e) { e.textContent = t; e.className = 's' + (ok ? ' ok' : ''); } }
+function ocupado(b) { ['bPdf', 'bFotos'].forEach(function (id) { var e = $(id); if (e) e.disabled = b; }); }
+async function salvarPdfs() {
+  ocupado(true); msg('sPdf', 'Gerando os PDFs…');
+  try {
+    var arq = []; for (var i = 0; i < VIS.length; i++) { if (VIS[i].soSoltas) continue; arq.push({ nome: VIS[i].base + '.pdf', blob: await pdfDaVistoria(VIS[i]) }); }
+    if (!arq.length) { ST.pdf = 'nada'; msg('sPdf', 'Não há vistorias com dados para gerar PDF.', true); return depois(); }
+    var dir = await pegarPasta();
+    if (dir) { var oks = 0; for (var j = 0; j < arq.length; j++) { if (await gravar(dir, ['Relatorios'], arq[j].nome, arq[j].blob)) oks++; } if (oks === arq.length) { ST.pdf = 'ok'; ST.verificado.pdf = true; msg('sPdf', '✔ ' + oks + ' PDF(s) salvo(s) na pasta “' + dir.name + '/Relatorios”.', true); } else { msg('sPdf', 'Só ' + oks + ' de ' + arq.length + ' PDF(s) foram gravados. Tente de novo.'); } }
+    else if (navigator.canShare && !ST.modoZip && navigator.canShare({ files: arq.map(function (a) { return new File([a.blob], a.nome, { type: 'application/pdf' }); }) })) {
+      await navigator.share({ files: arq.map(function (a) { return new File([a.blob], a.nome, { type: 'application/pdf' }); }), title: 'Vistorias (PDF)' }); ST.pdf = 'ok'; msg('sPdf', '✔ ' + arq.length + ' PDF(s) enviados para salvar. Confira onde ficaram.', true);
+    } else { arq.forEach(function (a, i) { setTimeout(function () { baixar(a.blob, a.nome); }, i * 700); }); ST.pdf = 'ok'; msg('sPdf', '✔ ' + arq.length + ' PDF(s) baixado(s) para a pasta Downloads. Confira o aparelho.', true); }
+  } catch (e) { if (e && e.name === 'AbortError') msg('sPdf', 'Cancelado. Toque de novo quando quiser.'); else msg('sPdf', 'Não foi possível salvar: ' + (e.message || e)); }
+  ocupado(false); depois();
+}
+async function salvarFotos() {
+  ocupado(true); msg('sFotos', 'Preparando as fotos…');
+  try {
+    var com = VIS.filter(function (v) { return v.fotos.length; });
+    if (!com.length) { ST.fotos = 'nada'; msg('sFotos', 'Não há fotos neste aparelho.', true); return depois(); }
+    var dir = await pegarPasta(), total = 0, okTotal = 0;
+    if (dir) {
+      for (var i = 0; i < com.length; i++) { var l = nomesFotos(com[i]); for (var j = 0; j < l.length; j++) { total++; if (await gravar(dir, ['Fotos', com[i].base], l[j].nome, l[j].r.blob)) okTotal++; msg('sFotos', 'Salvando… ' + okTotal + ' de ' + total); } total++; if (await gravar(dir, ['Fotos', com[i].base], 'LEGENDAS.csv', new Blob([csvFotos(l)], { type: 'text/csv' }))) okTotal++; }
+      if (okTotal === total) { ST.fotos = 'ok'; ST.verificado.fotos = true; msg('sFotos', '✔ ' + (total - com.length) + ' foto(s) salva(s) como arquivos separados na pasta “' + dir.name + '/Fotos”.', true); } else msg('sFotos', 'Só ' + okTotal + ' de ' + total + ' arquivos foram gravados. Tente de novo.');
+    } else {
+      for (var a = 0; a < com.length; a++) { var l2 = nomesFotos(com[a]), it = []; for (var b = 0; b < l2.length; b++) it.push({ nome: l2[b].nome, dados: new Uint8Array(await l2[b].r.blob.arrayBuffer()) }); it.push({ nome: 'LEGENDAS.csv', dados: new TextEncoder().encode(csvFotos(l2)) }); (function (z, nome, d) { setTimeout(function () { baixar(z, nome); }, d); })(montarZip(it), com[a].base + ' - fotos.zip', a * 900); total += l2.length; }
+      ST.fotos = 'ok'; msg('sFotos', '✔ ' + total + ' foto(s) baixada(s) em ' + com.length + ' arquivo(s) ZIP (as imagens ficam soltas dentro dele, com o nome de sempre). Abra o ZIP e extraia as fotos.', true);
+    }
+  } catch (e) { if (e && e.name === 'AbortError') msg('sFotos', 'Cancelado. Toque de novo quando quiser.'); else msg('sFotos', 'Não foi possível salvar: ' + (e.message || e)); }
+  ocupado(false); depois();
+}
+
+/* ---------------- encerrar e apagar ---------------- */
+var cont = null;
+function precisa() { var p = VIS.some(function (v) { return !v.soSoltas; }), f = VIS.some(function (v) { return v.fotos.length; }); return { pdf: p, fotos: f }; }
+function depois() {
+  var n = precisa(), pdfOk = !n.pdf || ST.pdf, fotosOk = !n.fotos || ST.fotos;
+  if (!(pdfOk && fotosOk)) return;
+  var verif = (!n.pdf || ST.verificado.pdf) && (!n.fotos || ST.verificado.fotos);
+  var el = $('fim'); el.style.display = 'block';
+  if (verif) { var s = 8; el.innerHTML = '<div class="n">Tudo salvo e conferido. Este aparelho será <b>encerrado e os dados antigos apagados</b> em <b id="seg">' + s + '</b> s.</div><button class="b" id="bCanc">Cancelar</button>'; $('bCanc').onclick = function () { clearInterval(cont); el.innerHTML = '<button class="b vm" id="bApaga">Encerrar e apagar os dados deste aparelho</button>'; $('bApaga').onclick = apagarTudo; };
+    cont = setInterval(function () { s--; var e = $('seg'); if (e) e.textContent = s; if (s <= 0) { clearInterval(cont); apagarTudo(); } }, 1000); }
+  else { el.innerHTML = '<div class="n">Confira no aparelho se os arquivos foram salvos (PDF e fotos). Depois toque abaixo para <b>encerrar e apagar os dados antigos</b> deste aparelho. Isto não pode ser desfeito.</div><button class="b vm" id="bApaga">Já conferi: encerrar e apagar os dados</button>'; $('bApaga').onclick = apagarTudo; }
+}
+async function apagarTudo() {
+  var area = $('area'); area.innerHTML = '<p><small>Apagando os dados antigos deste aparelho…</small></p>'; var feito = [];
+  try { var rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(function (r) { return r.unregister(); })); feito.push('serviço offline'); } catch (e) {}
+  try { var ks = await caches.keys(); await Promise.all(ks.map(function (k) { return caches.delete(k); })); feito.push('cache'); } catch (e) {}
+  try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('vistoria_cbmpa') === 0) localStorage.removeItem(k); }); feito.push('dados salvos'); } catch (e) {}
+  try { sessionStorage.clear(); } catch (e) {}
+  await new Promise(function (ok) { try { var r = indexedDB.deleteDatabase(DBN); r.onsuccess = function () { feito.push('fotos e histórico'); ok(); }; r.onerror = ok; r.onblocked = function () { area.innerHTML = '<div class="n">Feche as outras abas ou janelas deste aplicativo e recarregue esta página para concluir a limpeza.</div>'; ok(); }; } catch (e) { ok(); } });
+  area.innerHTML = '<div class="n"><b>Encerrado.</b> Os dados antigos foram removidos deste aparelho (' + feito.join(', ') + '). Você já pode fechar esta página.</div>';
+}
+
+/* ---------------- tela ---------------- */
+async function iniciar() {
+  if (NOVO_ENDERECO) { var n = $('novo'); n.style.display = 'block'; n.innerHTML = 'Nova versão: <a href="' + esc(NOVO_ENDERECO) + '">' + esc(NOVO_ENDERECO) + '</a>'; }
+  var area = $('area');
+  try { await carregar(); } catch (e) { VIS = []; }
+  var nv = VIS.filter(function (v) { return !v.soSoltas; }).length, nf = VIS.reduce(function (s, v) { return s + v.fotos.length; }, 0);
+  if (!nv && !nf) { await apagarTudo(); return; }
+  var pasta = !!window.showDirectoryPicker;
+  area.innerHTML = '<div class="n">Há <b>' + nv + ' vistoria(s)</b> e <b>' + nf + ' foto(s)</b> guardadas neste aparelho. <b>Salve antes de continuar:</b> depois de salvar, o aparelho é encerrado e os dados antigos são apagados. Esta página fica disponível por tempo limitado.</div>' +
+    (nv ? '<button class="b or" id="bPdf">📄 Salvar as vistorias (PDF)</button><p class="s" id="sPdf"></p>' : '') +
+    (nf ? '<button class="b vd" id="bFotos">📷 Salvar as fotos (arquivos separados)</button><p class="s" id="sFotos"></p>' : '') +
+    '<div class="n" style="font-size:14px">' + (pasta ? 'Na primeira vez o navegador pede para <b>escolher uma pasta</b>: escolha a mesma para os dois botões. Os PDFs vão para a subpasta Relatorios e as fotos para Fotos, cada uma com o nome de sempre.' : 'Este navegador não deixa escolher pasta: os PDFs e as fotos (em arquivos ZIP) serão baixados para a pasta Downloads.') + '</div>' +
+    (pasta ? '<button class="l" id="bZip">Prefiro baixar em ZIP / Downloads</button>' : '') + '<div id="fim" style="display:none"></div>';
+  if ($('bPdf')) $('bPdf').onclick = salvarPdfs; if ($('bFotos')) $('bFotos').onclick = salvarFotos;
+  if ($('bZip')) $('bZip').onclick = function () { ST.modoZip = true; ST.pasta = null; $('bZip').style.display = 'none'; };
+  window.__desligamento = { vis: function () { return VIS; }, pdf: pdfDaVistoria, nomes: nomesFotos, zip: montarZip, apagar: apagarTudo };
+}
+iniciar();
+})();
+</script>
+</body>
+</html>
